@@ -3,22 +3,24 @@ body {
   background: radial-gradient(circle at center, #111, #000);
   color: #fff;
   margin: 0;
-  padding: 0;
+  padding: 0 20px 40px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  height: 100vh;
+  justify-content: flex-start;
+  min-height: 100vh;
   text-align: center;
 }
 
 h1 {
   font-size: 2.5em;
   margin-bottom: 0.2em;
+  margin-top: 20px;
 }
 
 .stats {
   margin-bottom: 1em;
+  font-size: 1.2em;
 }
 
 .button-grid {
@@ -26,6 +28,7 @@ h1 {
   flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
+  max-width: 400px;
 }
 
 button {
@@ -37,6 +40,7 @@ button {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
+  user-select: none;
 }
 
 button:hover {
@@ -47,5 +51,30 @@ button:hover {
 .log {
   margin-top: 1em;
   max-width: 400px;
-  font-size: 0.9em;
+  font-size: 1em;
+  white-space: pre-wrap;
+  line-height: 1.3;
+  min-height: 3.5em;
 }
+
+.achievements {
+  margin-top: 15px;
+  color: #0f0;
+  font-weight: 600;
+  font-size: 1em;
+}
+
+#reset-btn {
+  margin-top: 25px;
+  background: #900;
+  border-color: #c33;
+  color: #fff;
+  padding: 12px 25px;
+  font-weight: bold;
+}
+
+#reset-btn:hover {
+  background: #c33;
+  color: #fff;
+}
+
