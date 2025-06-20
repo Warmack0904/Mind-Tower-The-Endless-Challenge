@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mind Tower: The Endless Challenge</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at center, #111, #000);
+      color: #fff;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+    }
+    h1 {
+      font-size: 2.5em;
+      margin-bottom: 0.2em;
+    }
+    .stats {
+      margin-bottom: 1em;
+    }
+    .button-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+    button {
+      background: #222;
+      border: 2px solid #444;
+      color: #0f0;
+      padding: 10px 20px;
+      font-size: 1em;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      background: #0f0;
+      color: #000;
+    }
+    .log {
+      margin-top: 1em;
+      max-width: 400px;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Mind Tower</h1>
+  <div class="stats">
+    <div>Floor: <span id="floor">1</span></div>
+    <div>Lives: <span id="lives">3</span></div>
+  </div>
+  <div class="button-grid" id="door-buttons"></div>
+  <div class="log" id="log"></div>
+
+  <script>
+    let floor = 1;
+    let lives = 3;
+    const floorEl = document.getElementById('floor');
+    const livesEl = document.getElementById('lives');
+    const doorButtons = document.getElementById('door-buttons');
+    const log = document.getElementById('log');
+
+    function updateUI() {
+      floorEl.textContent = floor;
+      livesEl.textContent = lives;
+      doorButtons.innerHTML = '';
+      log.innerHTML = '';
+
+      let doors = Math.min(3 + Math.floor(floor / 2), 6); // 3 to 6 doors
+      for (let i = 1; i <= doors; i++) {
+        let btn = document.createElement('button');
+        btn.textContent = `Door ${i}`;
+        btn.onclick = () => handleChoice();
+        doorButtons.appendChild(btn);
+      }
+    }
+
+    function handleChoice() {
+      const roll = Math.floor(Math.random() * 6) + 1;
+      if (roll <= 2) {
+        lives--;
+        log.textContent = 'It was a trap! You lost a life.';
+      } else if (roll <= 4) {
+        log.textContent = 'The path loops. You stay on the same floor.';
+      } else {
+        floor++;
+        log.textContent = 'Success! You ascend to the next floor.';
+      }
+
+      if (lives <= 0) {
+        setTimeout(() => {
+          alert('Game over! You reached Floor ' + floor);
+          floor = 1;
+          lives = 3;
+        }, 100);
+      }
+
+      updateUI();
+    }
+
+    updateUI();
+  </script>
+</body>
+</html>
