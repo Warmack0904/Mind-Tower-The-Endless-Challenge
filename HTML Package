@@ -2,33 +2,36 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mind Tower: The Endless Challenge</title>
+  <title>Mind Tower: The Endless Challenge v2.0</title>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
       background: radial-gradient(circle at center, #111, #000);
       color: #fff;
       margin: 0;
-      padding: 0;
+      padding: 0 20px 40px 20px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      height: 100vh;
+      justify-content: flex-start;
+      min-height: 100vh;
       text-align: center;
     }
     h1 {
       font-size: 2.5em;
       margin-bottom: 0.2em;
+      margin-top: 20px;
     }
     .stats {
       margin-bottom: 1em;
+      font-size: 1.2em;
     }
     .button-grid {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
       gap: 10px;
+      max-width: 400px;
     }
     button {
       background: #222;
@@ -39,6 +42,7 @@
       border-radius: 8px;
       cursor: pointer;
       transition: all 0.2s ease;
+      user-select: none;
     }
     button:hover {
       background: #0f0;
@@ -47,66 +51,290 @@
     .log {
       margin-top: 1em;
       max-width: 400px;
-      font-size: 0.9em;
+      font-size: 1em;
+      white-space: pre-wrap;
+      line-height: 1.3;
+      min-height: 3.5em;
+    }
+    .achievements {
+      margin-top: 15px;
+      color: #0f0;
+      font-weight: 600;
+      font-size: 1em;
+    }
+    #reset-btn {
+      margin-top: 25px;
+      background: #900;
+      border-color: #c33;
+      color: #fff;
+      padding: 12px 25px;
+      font-weight: bold;
+    }
+    #reset-btn:hover {
+      background: #c33;
+      color: #fff;
     }
   </style>
 </head>
 <body>
   <h1>Mind Tower</h1>
+
   <div class="stats">
     <div>Floor: <span id="floor">1</span></div>
     <div>Lives: <span id="lives">3</span></div>
   </div>
+
   <div class="button-grid" id="door-buttons"></div>
+
   <div class="log" id="log"></div>
 
+  <div class="achievements" id="achievements"></div>
+
+  <button id="reset-btn">Reset Game</button>
+
   <script>
+    // Game State
     let floor = 1;
     let lives = 3;
+    let inventory = [];
+    let achievements = {
+      floor10: false,
+      sixDoorsInRow: 0,
+      trapsDodged: 0,
+      noDamageVictory: false,
+    };
+    let lastSafeDoors = []; // memory for floors (to handle memory door)
+    let consecutiveSafeDoors = 0;
+    let noDamageThisRun = true;
+
+    // DOM elements
     const floorEl = document.getElementById('floor');
     const livesEl = document.getElementById('lives');
     const doorButtons = document.getElementById('door-buttons');
     const log = document.getElementById('log');
+    const achievementEl = document.getElementById('achievements');
+    const resetBtn = document.getElementById('reset-btn');
+
+    // Sound helper
+    function playSound(type) {
+      if (!window.AudioContext) return;
+      const ctx = new AudioContext();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g);
+      g.connect(ctx.destination);
+      if (type === 'trap') o.frequency.value = 200;
+      else if (type === 'success') o.frequency.value = 600;
+      else if (type === 'click') o.frequency.value = 400;
+      else o.frequency.value = 300;
+      o.start(0);
+      g.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.15);
+      o.stop(ctx.currentTime + 0.15);
+    }
+
+    // Utility to save/load
+    function saveGame() {
+      const saveData = {
+        floor, lives, inventory, achievements,
+        lastSafeDoors, consecutiveSafeDoors, noDamageThisRun,
+      };
+      localStorage.setItem('mindTowerSave', JSON.stringify(saveData));
+    }
+
+    function loadGame() {
+      const saveData = JSON.parse(localStorage.getItem('mindTowerSave'));
+      if (!saveData) return false;
+      floor = saveData.floor;
+      lives = saveData.lives;
+      inventory = saveData.inventory || [];
+      achievements = saveData.achievements || achievements;
+      lastSafeDoors = saveData.lastSafeDoors || [];
+      consecutiveSafeDoors = saveData.consecutiveSafeDoors || 0;
+      noDamageThisRun = saveData.noDamageThisRun !== undefined ? saveData.noDamageThisRun : true;
+      return true;
+    }
+
+    function resetGame() {
+      floor = 1;
+      lives = 3;
+      inventory = [];
+      achievements = {
+        floor10: false,
+        sixDoorsInRow: 0,
+        trapsDodged: 0,
+        noDamageVictory: false,
+      };
+      lastSafeDoors = [];
+      consecutiveSafeDoors = 0;
+      noDamageThisRun = true;
+      saveGame();
+      updateUI();
+      log.textContent = 'Game reset. Ready to climb!';
+    }
+
+    // Relic effects
+    function hasRelic(name) {
+      return inventory.includes(name);
+    }
+
+    function useRelic(name) {
+      if (!hasRelic(name)) return false;
+      inventory = inventory.filter(r => r !== name);
+      return true;
+    }
+
+    // Generate safe door (random 1-based index)
+    function generateSafeDoor(doorsCount) {
+      return Math.floor(Math.random() * doorsCount) + 1;
+    }
+
+    // Achievements update
+    function checkAchievements() {
+      if (floor >= 10 && !achievements.floor10) {
+        achievements.floor10 = true;
+        log.textContent += '\nAchievement unlocked: Reached Floor 10!';
+      }
+      if (consecutiveSafeDoors >= 6 && achievements.sixDoorsInRow < 6) {
+        achievements.sixDoorsInRow = 6;
+        log.textContent += '\nAchievement unlocked: 6 Doors Survived in a Row!';
+      }
+      if (achievements.trapsDodged >= 3) {
+        log.textContent += '\nAchievement unlocked: Dodged 3 traps!';
+      }
+      if (floor > 10 && noDamageThisRun) {
+        achievements.noDamageVictory = true;
+        log.textContent += '\nAchievement unlocked: No Damage Victory!';
+      }
+
+      // Show achievements
+      let achList = Object.entries(achievements).filter(([k,v]) => v);
+      achievementEl.textContent = 'Achievements: ' + (achList.length ? achList.map(a => a[0]).join(', ') : 'None');
+    }
+
+    // Create relic drop
+    function generateRelic() {
+      const relics = ['Phoenix Feather', 'Vision Lens', 'Time Stone'];
+      return relics[Math.floor(Math.random() * relics.length)];
+    }
 
     function updateUI() {
       floorEl.textContent = floor;
       livesEl.textContent = lives;
       doorButtons.innerHTML = '';
-      log.innerHTML = '';
+      log.textContent = '';
 
       let doors = Math.min(3 + Math.floor(floor / 2), 6); // 3 to 6 doors
+
+      // Generate safe door logic
+      let safeDoor;
+      // Memory door logic (floor 5+)
+      if (floor >= 5 && lastSafeDoors.length >= 2) {
+        // Memory door must be the same as 2 floors ago safe door
+        safeDoor = lastSafeDoors[lastSafeDoors.length - 2];
+        log.textContent = 'Memory Door present! Recall the safe door from 2 floors ago.';
+      } else {
+        safeDoor = generateSafeDoor(doors);
+      }
+
+      lastSafeDoors.push(safeDoor);
+
       for (let i = 1; i <= doors; i++) {
         let btn = document.createElement('button');
         btn.textContent = `Door ${i}`;
-        btn.onclick = () => handleChoice();
+        btn.onclick = () => handleChoice(i, safeDoor);
         doorButtons.appendChild(btn);
       }
+
+      checkAchievements();
+      saveGame();
     }
 
-    function handleChoice() {
-      const roll = Math.floor(Math.random() * 6) + 1;
-      if (roll <= 2) {
-        lives--;
-        log.textContent = 'It was a trap! You lost a life.';
-      } else if (roll <= 4) {
-        log.textContent = 'The path loops. You stay on the same floor.';
-      } else {
+    function handleChoice(chosenDoor, safeDoor) {
+      playSound('click');
+
+      if (chosenDoor === safeDoor) {
+        // Safe door chosen
+        consecutiveSafeDoors++;
+        log.textContent = 'Safe door! You advance to the next floor.';
+        playSound('success');
         floor++;
-        log.textContent = 'Success! You ascend to the next floor.';
+        noDamageThisRun = noDamageThisRun && true;
+      } else {
+        // Trap or special event check
+        consecutiveSafeDoors = 0;
+        // Trap chance with Vision Lens relic reduces trap chance
+        let trapChance = hasRelic('Vision Lens') ? 0.25 : 0.5;
+
+        if (Math.random() < trapChance) {
+          // Trap hits
+          playSound('trap');
+          // Phoenix Feather saves one fatal hit
+          if (lives === 1 && hasRelic('Phoenix Feather')) {
+            useRelic('Phoenix Feather');
+            log.textContent = 'Trap triggered! Your Phoenix Feather saves you from death!';
+          } else {
+            lives--;
+            noDamageThisRun = false;
+            log.textContent = 'Trap triggered! You lose a life.';
+          }
+          achievements.trapsDodged = (achievements.trapsDodged || 0) + 1;
+        } else {
+          // Loop floor
+          log.textContent = 'Trap avoided! You stay on the same floor.';
+          achievements.trapsDodged = (achievements.trapsDodged || 0) + 1;
+        }
+      }
+
+      // Bonus room chance after floor 3
+      if (floor > 3 && Math.random() < 0.15) {
+        // Give relic
+        let relic = generateRelic();
+        inventory.push(relic);
+        log.textContent += ` Bonus Room! You found a relic: ${relic}`;
+      }
+
+      // Mini-boss chance every 5 floors
+      if (floor % 5 === 0) {
+        log.textContent += '\nMini-boss challenge! Guess a number between 1 and 3 to survive.';
+        let guess = prompt('Mini-boss! Enter a number (1-3):');
+        if (guess !== null) {
+          guess = parseInt(guess);
+          let correct = Math.floor(Math.random() * 3) + 1;
+          if (guess === correct) {
+            log.textContent += '\nYou defeated the mini-boss!';
+            playSound('success');
+          } else {
+            log.textContent += '\nYou failed! Lose one life.';
+            playSound('trap');
+            lives--;
+            noDamageThisRun = false;
+          }
+        }
       }
 
       if (lives <= 0) {
         setTimeout(() => {
           alert('Game over! You reached Floor ' + floor);
-          floor = 1;
-          lives = 3;
+          resetGame();
         }, 100);
+        return;
       }
 
       updateUI();
     }
 
-    updateUI();
+    // Load game or start new
+    if (!loadGame()) {
+      resetGame();
+    } else {
+      updateUI();
+    }
+
+    // Reset button event
+    resetBtn.onclick = () => {
+      if (confirm('Are you sure you want to reset your progress?')) resetGame();
+    };
   </script>
 </body>
 </html>
+
